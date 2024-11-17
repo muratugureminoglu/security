@@ -29,8 +29,9 @@ jobs:
         uses: docker/scout-action@v1.15.1
         with:
             command: cves,recommendations
+            image: antmedia/enterprise:latest
 
-      - name: Docker Scout Commands
-        run: |
-          docker scout cves  
+#      - name: Docker Scout Commands
+#        run: |
+#          docker scout cves  
           
