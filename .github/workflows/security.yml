@@ -45,7 +45,7 @@ jobs:
             
             try {
               const sarifResults = JSON.parse(rawData);
-              
+              console.log(`Advisory is being created for repo: ${context.repo.owner}/${context.repo.repo}`);
               if (!sarifResults.runs || !sarifResults.runs[0] || !sarifResults.runs[0].tool.driver.rules) {
                 console.log('No vulnerabilities found or invalid SARIF format');
                 return;
