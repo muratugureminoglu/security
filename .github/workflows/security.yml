@@ -31,8 +31,70 @@ jobs:
             command: cves
             image: antmedia/enterprise:latest
             summary: true
+            only-severity: critical,high
+            format: json
+            output-file: scout-results.json
+      - name: Process Scout Results and Create Advisories
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const scoutResults = JSON.parse(fs.readFileSync('scout-results.json', 'utf8'));
+            
+            for (const vulnerability of scoutResults.vulnerabilities) {
+              const cveId = vulnerability.identifiers.find(id => id.startsWith('CVE-'));
+              if (!cveId) continue;
+              
+              try {
+                // Advisory başlığı ve açıklaması oluştur
+                const advisory = {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  security_advisory: {
+                    cve_id: cveId,
+                    summary: `${vulnerability.title}`,
+                    description: `
+                      ## Vulnerability Details
+                      - Severity: ${vulnerability.severity}
+                      - Affected Package: ${vulnerability.package.name}
+                      - Affected Version: ${vulnerability.package.version}
+                      
+                      ## Description
+                      ${vulnerability.description}
+                      
+                      ## Remediation
+                      ${vulnerability.fix ? `Update to version ${vulnerability.fix.versions[0]}` : 'No fix version available yet.'}
+                      
+                      ## References
+                      ${vulnerability.references.join('\n')}
+                    `,
+                    vulnerabilities: [{
+                      package: {
+                        ecosystem: "DOCKER",
+                        name: vulnerability.package.name
+                      },
+                      severity: vulnerability.severity.toUpperCase(),
+                      affected_version_range: `<=${vulnerability.package.version}`,
+                      fixed_version: vulnerability.fix ? vulnerability.fix.versions[0] : null
+                    }],
+                    state: "DRAFT"
+                  }
+                };
+                
+                // GitHub Security Advisory oluştur
+                await github.rest.securityAdvisories.createRepositoryAdvisory(advisory);
+                console.log(`Created advisory for ${cveId}`);
+                
+              } catch (error) {
+                if (error.status === 422) {
+                  console.log(`Advisory for ${cveId} already exists`);
+                } else {
+                  console.error(`Error creating advisory for ${cveId}:`, error);
+                }
+              }
+            }
 
-#      - name: Docker Scout Commands
-#        run: |
-#          docker scout cves  
+      - name: Cleanup
+        run: rm -f scout-results.json
           
