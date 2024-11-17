@@ -12,7 +12,6 @@ jobs:
   security-scan:
     runs-on: ubuntu-latest
     permissions:
-      # Security advisory ve repository yazma izinleri
       security-events: write
       contents: write
       pull-requests: write
@@ -36,11 +35,9 @@ jobs:
             
             async function createOrUpdateAdvisory(cve) {
               try {
-                // Advisory başlığı ve ID oluştur
                 const advisoryId = `CVE-${cve.id}`;
                 const title = `Security Advisory: ${cve.id}`;
                 
-                // Mevcut advisory'leri kontrol et
                 const existingAdvisories = await github.rest.securityAdvisories.listRepositoryAdvisories({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -51,7 +48,6 @@ jobs:
                 );
                 
                 if (!existing) {
-                  // Yeni advisory oluştur
                   const advisory = await github.rest.securityAdvisories.createRepositoryAdvisory({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
