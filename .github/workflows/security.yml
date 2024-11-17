@@ -71,6 +71,8 @@ jobs:
                 
                 try {
                   const advisory = {
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
                     summary: title,
                     description: `
                       ## Vulnerability Details
