@@ -27,5 +27,5 @@ jobs:
       - name: Docker Scout Scan
         id: scout-scan
         run: |
-          docker scout cves --format json > cve-report.json
+          docker scout cves 
           
