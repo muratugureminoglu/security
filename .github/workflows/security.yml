@@ -61,15 +61,33 @@ jobs:
                 continue;
               }
               
-              const title = vuln.shortDescription.text;
-              const description = vuln.help?.text || 'No detailed description available';
-              
-              const helpUrlParams = new URL(vuln.helpUri).searchParams;
-              const packageName = helpUrlParams.get('n') || 'Unknown';
-              const packageVersion = helpUrlParams.get('vr')?.replace(/[<=>]/g, '') || 'Unknown';
-              const ecosystem = helpUrlParams.get('t')?.toLowerCase() || 'maven';
-              
               try {
+                // Önce mevcut advisory'leri kontrol et
+                const existingAdvisories = await github.rest.securityAdvisories.listRepositoryAdvisories({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  direction: 'desc',
+                  sort: 'created'
+                });
+            
+                // CVE ID'ye göre kontrol et
+                const existingAdvisory = existingAdvisories.data.find(
+                  advisory => advisory.cve_id === cveId
+                );
+            
+                if (existingAdvisory) {
+                  console.log(`Advisory for ${cveId} already exists with ID: ${existingAdvisory.ghsa_id}. Skipping...`);
+                  continue;
+                }
+            
+                const title = vuln.shortDescription.text;
+                const description = vuln.help?.text || 'No detailed description available';
+                
+                const helpUrlParams = new URL(vuln.helpUri).searchParams;
+                const packageName = helpUrlParams.get('n') || 'Unknown';
+                const packageVersion = helpUrlParams.get('vr')?.replace(/[<=>]/g, '') || 'Unknown';
+                const ecosystem = helpUrlParams.get('t')?.toLowerCase() || 'maven';
+                
                 await github.rest.securityAdvisories.createRepositoryAdvisory({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -107,12 +125,11 @@ jobs:
                
               } catch (error) {
                 if (error.status === 422) {
-                  console.log(`Advisory for ${cveId} already exists`);
+                  console.log(`Error creating advisory for ${cveId} - it might already exist`);
                   console.error('Error status:', error.status);
                   console.error('Error message:', error.message);
                   console.log(`Ecosystem value: ${ecosystem}`);
                   console.log('Help URI:', vuln.helpUri);
-                  console.log('Ecosystem from URI:', helpUrlParams.get('t'));
                 } else {
                   console.error(`Error creating advisory for ${cveId}:`, error);
                   console.error('Full error details:', JSON.stringify(error, null, 2));
