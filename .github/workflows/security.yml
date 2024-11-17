@@ -46,61 +46,88 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const scoutResults = JSON.parse(fs.readFileSync('scout-results.json', 'utf8'));
+            const rawData = fs.readFileSync('scout-results.json', 'utf8');
             
-            for (const vulnerability of scoutResults.vulnerabilities) {
-              const cveId = vulnerability.identifiers.find(id => id.startsWith('CVE-'));
-              if (!cveId) continue;
+            try {
+              const sarifResults = JSON.parse(rawData);
               
-              try {
-                // Advisory başlığı ve açıklaması oluştur
-                const advisory = {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  security_advisory: {
-                    cve_id: cveId,
-                    summary: `${vulnerability.title}`,
-                    description: `
-                      ## Vulnerability Details
-                      - Severity: ${vulnerability.severity}
-                      - Affected Package: ${vulnerability.package.name}
-                      - Affected Version: ${vulnerability.package.version}
-                      
-                      ## Description
-                      ${vulnerability.description}
-                      
-                      ## Remediation
-                      ${vulnerability.fix ? `Update to version ${vulnerability.fix.versions[0]}` : 'No fix version available yet.'}
-                      
-                      ## References
-                      ${vulnerability.references.join('\n')}
-                    `,
-                    vulnerabilities: [{
-                      package: {
-                        ecosystem: "DOCKER",
-                        name: vulnerability.package.name
-                      },
-                      severity: vulnerability.severity.toUpperCase(),
-                      affected_version_range: `<=${vulnerability.package.version}`,
-                      fixed_version: vulnerability.fix ? vulnerability.fix.versions[0] : null
-                    }],
-                    state: "DRAFT"
+              if (!sarifResults.runs || !sarifResults.runs[0] || !sarifResults.runs[0].tool.driver.rules) {
+                console.log('No vulnerabilities found or invalid SARIF format');
+                return;
+              }
+              
+              const vulnerabilities = sarifResults.runs[0].tool.driver.rules;
+              console.log(`Found ${vulnerabilities.length} vulnerabilities to process`);
+              
+              for (const vuln of vulnerabilities) {
+                // CVE ID'yi çıkar
+                const cveId = vuln.id;
+                if (!cveId.startsWith('CVE-')) {
+                  console.log('Skipping non-CVE vulnerability:', cveId);
+                  continue;
+                }
+                
+                // Başlık ve açıklamayı parse et
+                const title = vuln.shortDescription.text;
+                const description = vuln.help?.text || 'No detailed description available';
+                
+                // helpUri'den paket bilgilerini çıkar
+                const helpUrlParams = new URL(vuln.helpUri).searchParams;
+                const packageName = helpUrlParams.get('n') || 'Unknown';
+                const packageVersion = helpUrlParams.get('vr')?.replace(/[<=>]/g, '') || 'Unknown';
+                const ecosystem = helpUrlParams.get('t') || 'DOCKER';
+                
+                try {
+                  const advisory = {
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    security_advisory: {
+                      cve_id: cveId,
+                      summary: title,
+                      description: `
+                        ## Vulnerability Details
+                        - Package: ${packageName}
+                        - Affected Version: ${packageVersion}
+                        - Ecosystem: ${ecosystem}
+                        
+                        ## Description
+                        ${description}
+                        
+                        ## References
+                        - [Docker Scout Report](${vuln.helpUri})
+                      `,
+                      vulnerabilities: [{
+                        package: {
+                          ecosystem: ecosystem.toUpperCase(),
+                          name: packageName
+                        },
+                        severity: "HIGH",
+                        affected_version_range: `<=${packageVersion}`,
+                        fixed_version: null
+                      }],
+                      state: "DRAFT"
+                    }
+                  };
+                  
+                  console.log(`Creating advisory for ${cveId}`);
+                  const response = await github.rest.securityAdvisories.createRepositoryAdvisory(advisory);
+                  console.log(`Successfully created advisory for ${cveId}`);
+                  
+                } catch (error) {
+                  if (error.status === 422) {
+                    console.log(`Advisory for ${cveId} already exists`);
+                  } else {
+                    console.error(`Error creating advisory for ${cveId}:`, error);
+                    console.error('Full error details:', JSON.stringify(error, null, 2));
                   }
-                };
-                
-                // GitHub Security Advisory oluştur
-                await github.rest.securityAdvisories.createRepositoryAdvisory(advisory);
-                console.log(`Created advisory for ${cveId}`);
-                
-              } catch (error) {
-                if (error.status === 422) {
-                  console.log(`Advisory for ${cveId} already exists`);
-                } else {
-                  console.error(`Error creating advisory for ${cveId}:`, error);
                 }
               }
+              
+            } catch (error) {
+              console.error('Error processing SARIF results:', error);
+              throw error;
             }
 
       - name: Cleanup
+        if: always()
         run: rm -f scout-results.json
-          
