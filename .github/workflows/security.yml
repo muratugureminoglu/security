@@ -27,6 +27,8 @@ jobs:
           
       - name: Docker Scout Install
         uses: docker/scout-action@v1.15.1
+        with:
+            command: cves,recommendations
 
       - name: Docker Scout Commands
         run: |
