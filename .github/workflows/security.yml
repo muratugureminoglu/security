@@ -19,99 +19,13 @@ jobs:
     
     steps:
       - uses: actions/checkout@v3
-      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Docker Scout Scan
         id: scout-scan
         run: |
           docker scout cves --format json > cve-report.json
           
-      - name: Process CVEs and Create Advisories
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const cveReport = JSON.parse(fs.readFileSync('cve-report.json', 'utf8'));
-            
-            async function createOrUpdateAdvisory(cve) {
-              try {
-                const advisoryId = `CVE-${cve.id}`;
-                const title = `Security Advisory: ${cve.id}`;
-                
-                const existingAdvisories = await github.rest.securityAdvisories.listRepositoryAdvisories({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                });
-                
-                const existing = existingAdvisories.data.find(
-                  a => a.ghsaId === advisoryId || a.summary.includes(cve.id)
-                );
-                
-                if (!existing) {
-                  const advisory = await github.rest.securityAdvisories.createRepositoryAdvisory({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    summary: title,
-                    description: `
-                    ## Description
-                    ${cve.description}
-                    
-                    ## Severity
-                    ${cve.severity || 'Not specified'}
-                    
-                    ## Affected Versions
-                    ${cve.affected_versions || 'All versions'}
-                    
-                    ## Mitigation
-                    ${cve.mitigation || 'Update to the latest version'}
-                    `,
-                    severity: cve.severity?.toLowerCase() || 'medium',
-                    cvss_vector_string: cve.cvss_vector || '',
-                    vulnerabilities: [{
-                      package: {
-                        ecosystem: 'Docker',
-                        name: cve.package_name || context.repo.repo
-                      },
-                      severity: cve.severity?.toLowerCase() || 'medium',
-                      vulnerable_version_range: cve.affected_versions || '*'
-                    }]
-                  });
-                  
-                  // Opsiyonel: Security Advisory için otomatik PR oluştur
-                  if (advisory.data.ghsaId) {
-                    await github.rest.securityAdvisories.createRepositoryAdvisoryCreditsUser({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      ghsa_id: advisory.data.ghsaId,
-                      login: context.actor
-                    });
-                    
-                    // Fix branch oluştur
-                    const branchName = `security-fix/${cve.id}`;
-                    await github.rest.git.createRef({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      ref: `refs/heads/${branchName}`,
-                      sha: context.sha
-                    });
-                  }
-                }
-              } catch (error) {
-                console.error(`Error processing CVE ${cve.id}:`, error);
-              }
-            }
-            
-            // Tüm CVE'ler için advisory oluştur
-            for (const cve of cveReport.vulnerabilities) {
-              await createOrUpdateAdvisory(cve);
-            }
-
-      - name: Send Notification
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          channel-id: 'security-updates'
-          slack-message: |
-            New security advisories have been created/updated. 
-            Please review at: https://github.com/${{ github.repository }}/security/advisories
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
