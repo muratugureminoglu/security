@@ -67,7 +67,7 @@ jobs:
                 const helpUrlParams = new URL(vuln.helpUri).searchParams;
                 const packageName = helpUrlParams.get('n') || 'Unknown';
                 const packageVersion = helpUrlParams.get('vr')?.replace(/[<=>]/g, '') || 'Unknown';
-                const ecosystem = helpUrlParams.get('t') || 'maven';
+                const ecosystem = helpUrlParams.get('t')?.toLowerCase() || 'maven';
                 
                 try {
                   const advisory = {
