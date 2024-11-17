@@ -70,8 +70,7 @@ jobs:
                 const ecosystem = helpUrlParams.get('t') || 'DOCKER';
                 
                 try {
-                  // GitHub API ile uyumlu hale getirilmiş yapı
-                  const advisoryData = {
+                  const advisory = {
                     summary: title,
                     description: `
                       ## Vulnerability Details
@@ -85,39 +84,29 @@ jobs:
                       ## References
                       - [Docker Scout Report](${vuln.helpUri})
                     `,
-                    cve_id: cveId,
                     severity: "high",
+                    cve_id: cveId,
                     vulnerabilities: [
                       {
                         package: {
                           name: packageName,
-                          ecosystem: ecosystem.toLowerCase()
+                          ecosystem: ecosystem.toUpperCase()
                         },
                         vulnerable_version_range: `<=${packageVersion}`,
-                        patched_versions: null
+                        patched_versions: packageVersion // Bu değeri güncelleyebilirsiniz
                       }
                     ],
-                    cwe_ids: ["CWE-1101", "CWE-20"],  // CWE bilgilerini burada güncelleyebilirsiniz
+                    cwe_ids: ["CWE-1101", "CWE-20"], // Gerekli CWE id'lerini buraya ekleyin
                     credits: [
-                      {
-                        login: "monalisa",
-                        type: "reporter"
-                      },
-                      {
-                        login: "octocat",
-                        type: "analyst"
-                      }
+                      { login: "monalisa", type: "reporter" },
+                      { login: "octocat", type: "analyst" }
                     ]
                   };
                   
                   console.log(`Creating advisory for ${cveId}`);
-                  const response = await github.request("POST /repos/{owner}/{repo}/security-advisories", {
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    ...advisoryData
-                  });
-                  
+                  const response = await github.rest.securityAdvisories.createRepositoryAdvisory(advisory);
                   console.log(`Successfully created advisory for ${cveId}`);
+                  
                 } catch (error) {
                   if (error.status === 422) {
                     console.log(`Advisory for ${cveId} already exists`);
@@ -132,8 +121,4 @@ jobs:
               console.error('Error processing SARIF results:', error);
               throw error;
             }
-      
-      
-            - name: Cleanup
-              if: always()
-              run: rm -f scout-results.json
+
