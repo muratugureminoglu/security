@@ -115,6 +115,8 @@ jobs:
                     console.error('Error status:', error.status);
                     console.error('Error message:', error.message);
                     console.log(`Ecosystem value: ${ecosystem}`);
+                    console.log('Help URI:', vuln.helpUri);
+                    console.log('Ecosystem from URI:', helpUrlParams.get('t'));
                   } else {
                     console.error(`Error creating advisory for ${cveId}:`, error);
                     console.error('Full error details:', JSON.stringify(error, null, 2));
