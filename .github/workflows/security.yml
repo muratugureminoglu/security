@@ -107,6 +107,7 @@ jobs:
                   console.log(`Creating advisory for ${cveId}`);
                   const response = await github.rest.securityAdvisories.createRepositoryAdvisory(advisory);
                   console.log(`Successfully created advisory for ${cveId}`);
+                  console.log(`Advisory is being created for repo: ${context.repo.owner}/${context.repo.repo}`);
                   
                 } catch (error) {
                   if (error.status === 422) {
