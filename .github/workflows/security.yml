@@ -43,90 +43,79 @@ jobs:
             const fs = require('fs');
             const rawData = fs.readFileSync('scout-results.json', 'utf8');
             
-            try {
-              const sarifResults = JSON.parse(rawData);
-              console.log(`Advisory is being created for repo: ${context.repo.owner}/${context.repo.repo}`);
-              if (!sarifResults.runs || !sarifResults.runs[0] || !sarifResults.runs[0].tool.driver.rules) {
-                console.log('No vulnerabilities found or invalid SARIF format');
-                return;
-              }
-              
-              const vulnerabilities = sarifResults.runs[0].tool.driver.rules;
-              console.log(`Found ${vulnerabilities.length} vulnerabilities to process`);
-              
-              for (const vuln of vulnerabilities) {
-                const cveId = vuln.id;
-                if (!cveId.startsWith('CVE-')) {
-                  console.log('Skipping non-CVE vulnerability:', cveId);
-                  continue;
-                }
-                
-                const title = vuln.shortDescription.text;
-                const description = vuln.help?.text || 'No detailed description available';
-                
-                const helpUrlParams = new URL(vuln.helpUri).searchParams;
-                const packageName = helpUrlParams.get('n') || 'Unknown';
-                const packageVersion = helpUrlParams.get('vr')?.replace(/[<=>]/g, '') || 'Unknown';
-                const ecosystem = helpUrlParams.get('t')?.toLowerCase() || 'maven';
-                
-                try {
-                  const advisory = {
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    summary: title,
-                    description: `
-                      ## Vulnerability Details
-                      - Package: ${packageName}
-                      - Affected Version: ${packageVersion}
-                      - Ecosystem: ${ecosystem}
-                      
-                      ## Description
-                      ${description}
-                      
-                      ## References
-                      - [Docker Scout Report](${vuln.helpUri})
-                    `,
-                    severity: "high",
-                    cve_id: cveId,
-                    vulnerabilities: [
-                      {
-                        package: {
-                          name: packageName,
-                          ecosystem: ecosystem: ecosystem
-                        },
-                        vulnerable_version_range: `<=${packageVersion}`,
-                        patched_versions: packageVersion // Bu değeri güncelleyebilirsiniz
-                      }
-                    ],
-                    cwe_ids: ["CWE-1101", "CWE-20"], // Gerekli CWE id'lerini buraya ekleyin
-                    credits: [
-                      { login: "monalisa", type: "reporter" },
-                      { login: "octocat", type: "analyst" }
-                    ]
-                  };
-                  
-                  console.log(`Creating advisory for ${cveId}`);
-                  const response = await github.rest.securityAdvisories.createRepositoryAdvisory(advisory);
-                  console.log(`Successfully created advisory for ${cveId}`);
-                 
-                } catch (error) {
-                  if (error.status === 422) {
-                    console.log(`Advisory for ${cveId} already exists`);
-                    console.error('Error status:', error.status);
-                    console.error('Error message:', error.message);
-                    console.log(`Ecosystem value: ${ecosystem}`);
-                    console.log('Help URI:', vuln.helpUri);
-                    console.log('Ecosystem from URI:', helpUrlParams.get('t'));
-                  } else {
-                    console.error(`Error creating advisory for ${cveId}:`, error);
-                    console.error('Full error details:', JSON.stringify(error, null, 2));
-                  }
-                }
-              }
-              
-              
-            } catch (error) {
-              console.error('Error processing SARIF results:', error);
-              throw error;
+            console.log(`Advisory is being created for repo: ${context.repo.owner}/${context.repo.repo}`);
+            const sarifResults = JSON.parse(rawData);
+            
+            if (!sarifResults.runs || !sarifResults.runs[0] || !sarifResults.runs[0].tool.driver.rules) {
+              console.log('No vulnerabilities found or invalid SARIF format');
+              return;
             }
-
+            
+            const vulnerabilities = sarifResults.runs[0].tool.driver.rules;
+            console.log(`Found ${vulnerabilities.length} vulnerabilities to process`);
+            
+            for (const vuln of vulnerabilities) {
+              const cveId = vuln.id;
+              if (!cveId.startsWith('CVE-')) {
+                console.log('Skipping non-CVE vulnerability:', cveId);
+                continue;
+              }
+              
+              const title = vuln.shortDescription.text;
+              const description = vuln.help?.text || 'No detailed description available';
+              
+              const helpUrlParams = new URL(vuln.helpUri).searchParams;
+              const packageName = helpUrlParams.get('n') || 'Unknown';
+              const packageVersion = helpUrlParams.get('vr')?.replace(/[<=>]/g, '') || 'Unknown';
+              const ecosystem = helpUrlParams.get('t')?.toLowerCase() || 'maven';
+              
+              try {
+                await github.rest.securityAdvisories.createRepositoryAdvisory({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  summary: title,
+                  description: `
+                    ## Vulnerability Details
+                    - Package: ${packageName}
+                    - Affected Version: ${packageVersion}
+                    - Ecosystem: ${ecosystem}
+                    
+                    ## Description
+                    ${description}
+                    
+                    ## References
+                    - [Docker Scout Report](${vuln.helpUri})
+                  `,
+                  severity: "high",
+                  cve_id: cveId,
+                  vulnerabilities: [{
+                    package: {
+                      name: packageName,
+                      ecosystem: ecosystem
+                    },
+                    vulnerable_version_range: `<=${packageVersion}`,
+                    patched_versions: packageVersion
+                  }],
+                  cwe_ids: ["CWE-1101", "CWE-20"],
+                  credits: [
+                    { login: "monalisa", type: "reporter" },
+                    { login: "octocat", type: "analyst" }
+                  ]
+                });
+                
+                console.log(`Successfully created advisory for ${cveId}`);
+               
+              } catch (error) {
+                if (error.status === 422) {
+                  console.log(`Advisory for ${cveId} already exists`);
+                  console.error('Error status:', error.status);
+                  console.error('Error message:', error.message);
+                  console.log(`Ecosystem value: ${ecosystem}`);
+                  console.log('Help URI:', vuln.helpUri);
+                  console.log('Ecosystem from URI:', helpUrlParams.get('t'));
+                } else {
+                  console.error(`Error creating advisory for ${cveId}:`, error);
+                  console.error('Full error details:', JSON.stringify(error, null, 2));
+                }
+              }
+            }
