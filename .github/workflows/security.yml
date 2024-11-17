@@ -92,7 +92,7 @@ jobs:
                       {
                         package: {
                           name: packageName,
-                          ecosystem: ecosystem.toUpperCase()
+                          ecosystem: ecosystem: ecosystem
                         },
                         vulnerable_version_range: `<=${packageVersion}`,
                         patched_versions: packageVersion // Bu değeri güncelleyebilirsiniz
