@@ -111,12 +111,21 @@ jobs:
                   
                 } catch (error) {
                   if (error.status === 422) {
-                    console.log(`Advisory for ${cveId} already exists`);
+                    // Hata detaylarını yazdır
+                    console.error(`Advisory for ${cveId} already exists. Full error details:`);
+                    console.error('Error status:', error.status);
+                    console.error('Error message:', error.message);
+                    if (error.errors) {
+                      // GitHub API'den dönen hataların ayrıntılarını yazdır
+                      console.error('Detailed errors:', JSON.stringify(error.errors, null, 2));
+                    } else {
+                      // Eğer daha fazla detay yoksa, genel hata mesajını yazdır
+                      console.error('Full error object:', JSON.stringify(error, null, 2));
+                    }
                   } else {
                     console.error(`Error creating advisory for ${cveId}:`, error);
                     console.error('Full error details:', JSON.stringify(error, null, 2));
                   }
-                }
               }
               
             } catch (error) {
