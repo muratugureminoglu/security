@@ -43,7 +43,7 @@ jobs:
       - name: Process Scout Results and Create Advisories
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.G_TOKEN }}
           script: |
             const fs = require('fs');
             const rawData = fs.readFileSync('scout-results.json', 'utf8');
