@@ -115,10 +115,6 @@ jobs:
                     patched_versions: packageVersion
                   }],
                   cwe_ids: ["CWE-1101", "CWE-20"],
-                  credits: [
-                    { login: "monalisa", type: "reporter" },
-                    { login: "octocat", type: "analyst" }
-                  ]
                 });
                 
                 console.log(`Successfully created advisory for ${cveId}`);
