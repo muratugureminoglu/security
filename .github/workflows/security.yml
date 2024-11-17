@@ -31,9 +31,9 @@ jobs:
             command: cves
             image: antmedia/enterprise:latest
             summary: true
-            only-severity: critical,high
+            only-severities: critical,high
             format: json
-            output-file: scout-results.json
+            sarif-file: scout-results.json
       - name: Process Scout Results and Create Advisories
         uses: actions/github-script@v7
         with:
