@@ -35,11 +35,6 @@ jobs:
             format: json
             sarif-file: scout-results.json
             
-      - name: Debug Scout Results
-        run: |
-          echo "Scout Results Content:"
-          cat scout-results.json | jq '.'
-            
       - name: Process Scout Results and Create Advisories
         uses: actions/github-script@v7
         with:
