@@ -108,7 +108,7 @@ jobs:
                   console.log(`Creating advisory for ${cveId}`);
                   const response = await github.rest.securityAdvisories.createRepositoryAdvisory(advisory);
                   console.log(`Successfully created advisory for ${cveId}`);
-                  
+                 
                 } catch (error) {
                   if (error.status === 422) {
                     // Hata detaylarını yazdır
@@ -126,7 +126,7 @@ jobs:
                     console.error(`Error creating advisory for ${cveId}:`, error);
                     console.error('Full error details:', JSON.stringify(error, null, 2));
                   }
-              }
+                }
               
             } catch (error) {
               console.error('Error processing SARIF results:', error);
